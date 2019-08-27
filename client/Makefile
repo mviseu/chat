@@ -1,39 +1,40 @@
-IDIR=./include
+IDIR = ./include
+SRCDIR = src
 
-CXX=clang++
-CXXFLAGS=-std=c++17 -Wall -Wextra -Werror
-CPPFLAGS= -Wall -O2 -I$(IDIR) -fPIC
-
-_DEPS:=Connect.h
-DEPS:=$(patsubst %,$(IDIR)/%,$(_DEPS))
+CXX = clang++
+CXXFLAGS = -std=c++17 -Wall -Wextra -Werror
+CPPFLAGS = -I$(IDIR) -fPIC
 
 
-SHARED:=libclient.so
+SHARED = libclient.so
 LDFLAGSSHARED += -shared
 LDFLAGSEXE += -L. $(SHARED)
 
+EXE = main
+MAIN = $(EXE:=.o)
 
-OBJ = Connect.o
-MAIN=main.o
-EXE=main
+SRCFILES = $(filter-out ./$(SRCDIR)/$(EXE).cpp, $(wildcard ./$(SRCDIR)/*.cpp))
+OBJLIB = $(patsubst ./$(SRCDIR)/%.cpp, %.o, $(SRCFILES))
 
-all:  $(OBJ) $(SHARED) $(MAIN) $(EXE)
+
+
+all: $(SHARED) $(EXE)
 
 
 $(EXE): $(MAIN)
 	$(CXX) $(LDFLAGSEXE) -o $@ $^
 
 
-$(SHARED): $(OBJ)
+$(SHARED): $(OBJLIB)
 	$(CXX) $(LDFLAGSSHARED) -o $@ $^
 
 
-
-%.o: src/%.cpp $(DEPS)
+%.o: $(SRCDIR)/%.cpp
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
 
 
 .PHONY:clean
 
+
 clean:
-	rm -rf $(EXE) *.o *.so main*
+	rm -rf $(EXE) *.o *.so
