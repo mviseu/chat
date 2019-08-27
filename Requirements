@@ -1,0 +1,72 @@
+Chat Server: TCP protocol
+
+Objectives
+* Write a chat server using boost::asio and multithreading libs
+* The server must listen out for connections via TCP and inform a client if a connection is established
+* The users (clients) can send messages to all other users via the command line
+* The users can also receive messages from all other users via the command line
+* If a connection is closed, all users in the chat must be informed
+* If a connection is opened, all users in the chat must be informed, even the client who has just logged in
+* Messages include a timestamp and a string text, as well as the username of the sender
+* The clients can disconnect using "exit" string
+
+
+Software
+* Use Makefiles
+* Use boost::asio
+* Use std::thread library
+* Compiler: clang
+
+
+Careful
+* Complexity worse case linear, preferrable O(1)
+* Deadlock on mutexes
+* Exception throwing
+* Spawning more threads than the ones needed (use lib facilities for this)
+
+
+Design
+
+Message
+STRUCT
+* header1: msg size
+* header 2: user size
+* utc time : time
+* string: message
+* string: user
+
+FUNCTIONS
+* Display() to ostream&
+* Note: exit message is: exit
+
+
+Client
+Different threads to separate concerns
+Main
+* Establish initial connection and display the prompt
+* Prompt user to give his username for uniqueID
+* thread to receive messages from socket (read from the socket and write to std::cout)
+	* Message must have size determined by header -> continue loop receiving until size is determined
+* thread to send messages (poll from std::cin and write to the socket)
+    * Message must construct header with a given size & message -> continue sending until everything is sent
+    * Message can be exit message
+
+
+Server
+Different threads for  (ON instead of ON2)
+Data that needs to be accessed by multiple threads (receive & send)
+MUTEX
+* List of clients -> map socket ID/client name -> can be added by looking for new clients and removes from an exit connection or from no contact
+* List of N messages to a given destination, with N mutexes
+
+
+* 1 thread to keep looking for new clients (protect client list mutex)
+* N threads to listen for incoming messages from N clients. 
+   * If client is not there remove from list of clients with mutex
+   * If client sends a message, add to each one of the list of destinations protecting with a mutex (no nesting, no problem with deadlock)
+
+* N threads to send messages to N clients
+  For each thread
+   * protect mutex of that client list
+   * send the message to each destination
+   * yield control!
