@@ -5,7 +5,7 @@
 
 int main() {
   try {
-    client::HostPort hostport("127.0.0.1", "1009");
+    client::HostPort hostport("localhost", "3000");
     boost::asio::io_context ioContext;
     boost::asio::ip::tcp::socket socket(ioContext);
     client::Connect(hostport, ioContext, socket);

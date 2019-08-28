@@ -1,8 +1,9 @@
 #pragma once
-#include "Sockets.h"
 #include <boost/asio.hpp>
+#include <vector>
 
 namespace server {
 auto AcceptConnections(int port, boost::asio::io_context &ioContext,
-                       Sockets sockets) -> void;
+                       std::vector<boost::asio::ip::tcp::socket> &clients,
+                       std::mutex &mutClients) -> void;
 } // namespace server
