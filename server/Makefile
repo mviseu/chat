@@ -7,7 +7,7 @@ CXXFLAGS = -std=c++17 -Wall -Wextra -Werror -pthread
 CPPFLAGS = -I$(INC_DIR) -fPIC
 
 
-SHARED = $(BUILD_DIR)/libclient.so
+SHARED = $(BUILD_DIR)/libserver.so
 LDFLAGS_SHARED += -shared
 LDFLAGS_EXE += -L. $(SHARED) -pthread
 
