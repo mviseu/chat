@@ -3,13 +3,13 @@ SRC_DIR = src
 BUILD_DIR=build
 
 CXX = clang++
-CXXFLAGS = -std=c++17 -Wall -Wextra -Werror
+CXXFLAGS = -std=c++17 -Wall -Wextra -Werror -pthread
 CPPFLAGS = -I$(INC_DIR) -fPIC
 
 
 SHARED = $(BUILD_DIR)/libclient.so
 LDFLAGS_SHARED += -shared
-LDFLAGS_EXE += -L. $(SHARED)
+LDFLAGS_EXE += -L. $(SHARED) -pthread
 
 MAIN_NAME = main
 EXE = $(BUILD_DIR)/$(MAIN_NAME)
