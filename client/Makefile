@@ -1,20 +1,22 @@
-IDIR = ./include
-SRCDIR = src
+INC_DIR = ./include
+SRC_DIR = src
+BUILD_DIR=build
 
 CXX = clang++
 CXXFLAGS = -std=c++17 -Wall -Wextra -Werror
-CPPFLAGS = -I$(IDIR) -fPIC
+CPPFLAGS = -I$(INC_DIR) -fPIC
 
 
-SHARED = libclient.so
-LDFLAGSSHARED += -shared
-LDFLAGSEXE += -L. $(SHARED)
+SHARED = $(BUILD_DIR)/libclient.so
+LDFLAGS_SHARED += -shared
+LDFLAGS_EXE += -L. $(SHARED)
 
-EXE = main
+MAIN_NAME = main
+EXE = $(BUILD_DIR)/$(MAIN_NAME)
 MAIN = $(EXE:=.o)
 
-SRCFILES = $(filter-out ./$(SRCDIR)/$(EXE).cpp, $(wildcard ./$(SRCDIR)/*.cpp))
-OBJLIB = $(patsubst ./$(SRCDIR)/%.cpp, %.o, $(SRCFILES))
+SRC_FILES = $(filter-out ./$(SRC_DIR)/$(MAIN_NAME).cpp, $(wildcard ./$(SRC_DIR)/*.cpp))
+OBJ = $(patsubst ./$(SRC_DIR)/%.cpp, ./$(BUILD_DIR)/%.o, $(SRC_FILES))
 
 
 
@@ -22,14 +24,14 @@ all: $(SHARED) $(EXE)
 
 
 $(EXE): $(MAIN)
-	$(CXX) $(LDFLAGSEXE) -o $@ $^
+	$(CXX) $(LDFLAGS_EXE) -o $@ $^
 
 
-$(SHARED): $(OBJLIB)
-	$(CXX) $(LDFLAGSSHARED) -o $@ $^
+$(SHARED): $(OBJ)
+	$(CXX) $(LDFLAGS_SHARED) -o $@ $^
 
 
-%.o: $(SRCDIR)/%.cpp
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
 
 
@@ -37,4 +39,4 @@ $(SHARED): $(OBJLIB)
 
 
 clean:
-	rm -rf $(EXE) *.o *.so
+	rm -rf build/*

@@ -1,4 +1,1 @@
-*.so*
-*.a
-*.o*
-main
+build*/
