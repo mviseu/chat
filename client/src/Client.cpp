@@ -1,5 +1,6 @@
 #include "Client.h"
 #include "Message.h"
+#include <chrono>
 #include <iostream>
 #include <string>
 
@@ -36,6 +37,7 @@ auto Client::ReadMessageSize() -> std::optional<int32_t> {
 
 auto Client::ReadMessageBody(int32_t msgSize) -> std::optional<std::string> {
   // Read in msg body, size includes the null
+
   const auto msg = DoRead(msgSize);
   return msg ? std::make_optional(*msg) : std::nullopt;
 }
@@ -56,20 +58,23 @@ auto Client::Read() -> void {
 
 auto Client::Write() -> void {}
 
-// Run launches separate threads to read/write and returns immediately
-auto Client::Run(const HostPort &hostport) -> void {
+// Run launches separate threads to read/write and returns after runFor duration
+auto Client::Run(const HostPort &hostport, const std::chrono::seconds &runFor)
+    -> void {
   boost::asio::ip::tcp::resolver resolver(ioContext_);
   auto endpoints = resolver.resolve(hostport.host, hostport.port);
   boost::asio::connect(socket_, endpoints);
+
   readFut_ = std::async(std::launch::async, &Client::Read, this);
   writeFut_ = std::async(std::launch::async, &Client::Write, this);
+
+  readFut_.wait_for(runFor);
+  writeFut_.wait_for(runFor);
 }
 
 Client::~Client() {
-  std::unique_lock<std::mutex> lck(mtxSocket_);
   socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both);
   socket_.close();
-  lck.unlock();
   readFut_.get();
   writeFut_.get();
 }

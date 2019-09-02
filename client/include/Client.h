@@ -10,7 +10,8 @@ class Client {
 public:
   Client() : socket_(ioContext_) {}
   ~Client();
-  auto Run(const HostPort &hostport) -> void;
+  auto Run(const HostPort &hostport, const std::chrono::seconds &runFor)
+      -> void;
 
 private:
   auto DoRead(int32_t nrBytes) -> std::optional<std::string>;
