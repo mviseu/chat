@@ -1,4 +1,5 @@
 #include "Client.h"
+#include "Message.h"
 #include <iostream>
 #include <string>
 
@@ -6,38 +7,16 @@ namespace client {
 
 namespace {
 
-constexpr int nrDigitsInMsgHeader = 4;
-constexpr int sizeOfMsgHeader = nrDigitsInMsgHeader + 1;
-
 auto PrintMessage(const std::string &msg) -> void {
   std::cout << msg << std::endl;
 }
 } // namespace
 
-auto Client::ReadMessageSize() -> std::optional<int32_t> {
-  // Read in msg header size that can have up to 4 characters representing
-  // digits 0/9 + null termination
-  std::string buf(sizeOfMsgHeader, '\0');
+auto Client::DoRead(int32_t nrBytes) -> std::optional<std::string> {
+  std::string buf(nrBytes, '\0');
   boost::system::error_code ec;
   std::unique_lock<std::mutex> lck(mtxSocket_);
-  boost::asio::read(socket_, boost::asio::buffer(buf, sizeOfMsgHeader), ec);
-  lck.unlock();
-  if (ec == boost::asio::error::eof) {
-    return std::nullopt; // Connection closed cleanly by peer.
-  }
-  if (ec) {
-    throw boost::system::system_error(ec); // Some other error.
-  }
-  return std::stoi(buf);
-}
-
-// message size includes the null
-auto Client::ReadMessageBody(int64_t msgSize) -> std::optional<std::string> {
-  // Read in msg body, size includes the null
-  std::string buf(msgSize, '\0');
-  boost::system::error_code ec;
-  std::unique_lock<std::mutex> lck(mtxSocket_);
-  boost::asio::read(socket_, boost::asio::buffer(buf, msgSize), ec);
+  boost::asio::read(socket_, boost::asio::buffer(buf, nrBytes), ec);
   lck.unlock();
   if (ec == boost::asio::error::eof) {
     return std::nullopt; // Connection closed cleanly by peer.
@@ -46,6 +25,19 @@ auto Client::ReadMessageBody(int64_t msgSize) -> std::optional<std::string> {
     throw boost::system::system_error(ec); // Some other error.
   }
   return buf;
+}
+
+auto Client::ReadMessageSize() -> std::optional<int32_t> {
+  // Read in msg header size that can have up to 4 characters representing
+  // digits 0/9 + null termination
+  const auto msgSize = DoRead(sizeOfMsgHeader);
+  return msgSize ? std::make_optional(std::stoi(*msgSize)) : std::nullopt;
+}
+
+auto Client::ReadMessageBody(int32_t msgSize) -> std::optional<std::string> {
+  // Read in msg body, size includes the null
+  const auto msg = DoRead(msgSize);
+  return msg ? std::make_optional(*msg) : std::nullopt;
 }
 
 auto Client::Read() -> void {
