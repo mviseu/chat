@@ -7,7 +7,7 @@ int main() {
   try {
     client::HostPort hostport("localhost", "3000");
     client::Client client;
-    client.Run(hostport, std::chrono::seconds(10));
+    client.Run(hostport);
     return 0;
   } catch (...) {
     throw;
