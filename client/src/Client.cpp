@@ -33,23 +33,37 @@ auto ToLower(const std::string &s) -> std::string {
 auto Client::DoRead(int32_t nrBytes) -> std::optional<std::string> {
   std::string buf(nrBytes, '\0');
   boost::system::error_code ec;
-  std::unique_lock<std::mutex> lck(mtxSocket_);
-  boost::asio::read(socket_, boost::asio::buffer(buf, nrBytes), ec);
-  lck.unlock();
-  if (ec == boost::asio::error::eof) {
-    return std::nullopt; // Connection closed cleanly by peer.
+  for (;;) {
+    std::unique_lock<std::mutex> lck(mtxSocket_);
+    boost::asio::socket_base::bytes_readable command(true);
+    socket_.io_control(command);
+    auto nrBytesReadable = command.get();
+    if (nrBytesReadable == static_cast<size_t>(nrBytes)) {
+      boost::asio::read(socket_, boost::asio::buffer(buf, nrBytes), ec);
+      lck.unlock();
+      if (ec == boost::asio::error::eof) {
+        return std::nullopt; // Connection closed cleanly by peer.
+      }
+      if (ec) {
+        throw boost::system::system_error(ec); // Some other error.
+      }
+      return buf;
+    } else {
+      lck.unlock();
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
-  if (ec) {
-    throw boost::system::system_error(ec); // Some other error.
-  }
-  return buf;
 }
 
 auto Client::DoWrite(const std::string &msg) -> bool {
   boost::system::error_code ec;
+  std::cout << "write started before lock" << std::endl;
   std::unique_lock<std::mutex> lck(mtxSocket_);
+  std::cout << "write started after lock" << std::endl;
   boost::asio::write(socket_, boost::asio::buffer(msg, msg.size()), ec);
   lck.unlock();
+  std::cout << "write done" << std::endl;
   if (ec) {
     throw boost::system::system_error(ec); // Some other error.
   }
