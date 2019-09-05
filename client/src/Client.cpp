@@ -10,6 +10,10 @@ namespace {
 
 const std::string exitCommand("exit");
 
+auto IsReady(const std::future<void> &fut) -> bool {
+  return fut.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+}
+
 auto PrintMessage(const std::string &msg) -> void {
   std::cout << msg << std::endl;
 }
@@ -34,6 +38,11 @@ auto Client::DoRead(int32_t nrBytes) -> std::optional<std::string> {
   std::string buf(nrBytes, '\0');
   boost::system::error_code ec;
   for (;;) {
+    // exit has been pressed
+    if (IsReady(writeFut_)) {
+      std::cout << "write future is ready" << std::endl;
+      return std::nullopt; // Exit has been typed by this client
+    }
     std::unique_lock<std::mutex> lck(mtxSocket_);
     boost::asio::socket_base::bytes_readable command(true);
     socket_.io_control(command);
@@ -48,10 +57,8 @@ auto Client::DoRead(int32_t nrBytes) -> std::optional<std::string> {
         throw boost::system::system_error(ec); // Some other error.
       }
       return buf;
-    } else {
-      lck.unlock();
     }
-
+    lck.unlock();
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 }
@@ -74,27 +81,30 @@ auto Client::ReadMessageSize() -> std::optional<int32_t> {
   // Read in msg header size that can have up to 4 characters representing
   // digits 0/9
   const auto msgSize = DoRead(nrDigitsInMsgHeader);
-  return msgSize ? std::make_optional(std::stoi(*msgSize)) : std::nullopt;
+  return (msgSize != std::nullopt) ? std::make_optional(std::stoi(*msgSize))
+                                   : std::nullopt;
 }
 
 auto Client::ReadMessageBody(int32_t msgSize) -> std::optional<std::string> {
   // Read in msg body
-  const auto msg = DoRead(msgSize);
-  return msg ? std::make_optional(*msg) : std::nullopt;
+  return DoRead(msgSize);
 }
 
 auto Client::Read() -> void {
   for (;;) {
     const auto sizeMsg = ReadMessageSize();
-    if (!sizeMsg) {
+    if (sizeMsg == std::nullopt) {
+      std::cout << "going to break in Cient::Read" << std::endl;
       break;
     }
+    std::cout << "after size" << std::endl;
     const auto msg = ReadMessageBody(*sizeMsg);
-    if (!msg) {
+    if (msg == std::nullopt) {
       break;
     }
     PrintMessage(*msg);
   }
+  std::cout << "Exit read" << std::endl;
 }
 
 auto Client::Write() -> void {
@@ -121,11 +131,14 @@ auto Client::Run(const HostPort &hostport) -> void {
   readFut_ = std::async(std::launch::async, &Client::Read, this);
   writeFut_ = std::async(std::launch::async, &Client::Write, this);
   writeFut_.wait();
+  std::cout << "complete run" << std::endl;
 }
 
 Client::~Client() {
+  std::unique_lock<std::mutex> lck(mtxSocket_);
   socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both);
   socket_.close();
+  lck.unlock();
   readFut_.get();
   writeFut_.get();
 }
