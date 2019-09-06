@@ -12,6 +12,7 @@ auto Server::RunWorkThread() -> void {
   try {
     ioContext_.run();
   } catch (...) {
+    std::cout << "Exception" << std::endl;
     throw;
   }
 }
@@ -25,11 +26,13 @@ Server::Server(int maxNrClients, int port)
   acceptor_.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
   std::cout << "before bind" << std::endl;
   acceptor_.bind(endpoint);
+  acceptor_.listen();
   std::cout << "after bind" << std::endl;
   assert(maxNrClients_ >= 1);
 }
 
 Server::~Server() {
+  std::cout << "start destruction" << std::endl;
   work_.reset();
   acceptor_.cancel();
   acceptor_.close();
@@ -42,14 +45,18 @@ Server::~Server() {
 
 auto Server::MoveSocket(int clientIndex, boost::asio::ip::tcp::socket socket)
     -> void {
+  std::cout << "moving socket for client " << clientIndex << std::endl;
   clients_[clientIndex]->socket = std::move(socket);
+  std::cout << "end movesocket for client " << clientIndex << std::endl;
 }
 
 auto Server::PostSocket(int clientIndex, boost::asio::ip::tcp::socket socket)
     -> void {
+  std::cout << "Post socket for client " << clientIndex << std::endl;
   clients_[clientIndex]->strand.post([this, clientIndex, &socket]() {
     this->MoveSocket(clientIndex, std::move(socket));
   });
+  std::cout << "end postsocket for client " << clientIndex << std::endl;
 }
 
 auto Server::DoAccept() -> void {
@@ -66,9 +73,11 @@ auto Server::DoAccept() -> void {
                 << std::endl;
       PostSocket(nrClients_, std::move(socket));
       ++nrClients_;
+      std::cout << ec << std::endl;
+      if (static_cast<size_t>(nrClients_) < runners_.size()) {
+        PostAccept();
+      }
     }
-    std::cout << ec.value() << std::endl;
-    PostAccept();
   });
 }
 
@@ -79,14 +88,14 @@ auto Server::PostAccept() -> void {
 }
 
 auto Server::Run() -> void {
-  // generate all the worker threads
-  std::generate_n(std::back_inserter(runners_), maxNrClients_, [this]() {
-    return std::async(std::launch::async, &Server::RunWorkThread, this);
-  });
-
   // and all the clients
   std::generate_n(std::back_inserter(clients_), maxNrClients_, [this]() {
     return std::make_shared<ClientWorker>(ioContext_);
+  });
+
+  // generate all the worker threads
+  std::generate_n(std::back_inserter(runners_), maxNrClients_, [this]() {
+    return std::async(std::launch::async, &Server::RunWorkThread, this);
   });
 
   std::cout << "Waiting for clients..." << std::endl;
