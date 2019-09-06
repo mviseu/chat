@@ -1,0 +1,2 @@
+invoke async_read/write on a strand with post
+for their completion handlers use strand.wrap to make sure intermediary handlers are also called on the same strand
