@@ -4,8 +4,8 @@
 
 int main() {
   try {
-    server::Server server;
-    server.Listen(3000);
+    server::Server server(10, 3000);
+    server.Run();
     return 0;
   } catch (...) {
     throw;

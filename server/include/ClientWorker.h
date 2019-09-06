@@ -10,13 +10,11 @@ class ClientWorker {
 public:
   ClientWorker(boost::asio::io_context &ioContext);
   ~ClientWorker();
-
-private:
   // have a strand per socket to ensure sequential ops and safety accessing the
   // socket
-  boost::asio::io_context::strand strand_;
+  boost::asio::io_context::strand strand;
   // one socket per client
-  boost::asio::ip::tcp::socket socket_;
+  boost::asio::ip::tcp::socket socket;
 };
 
 } // namespace server
