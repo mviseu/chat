@@ -131,6 +131,9 @@ auto Client::Run(const HostPort &hostport) -> void {
   readFut_ = std::async(std::launch::async, &Client::Read, this);
   writeFut_ = std::async(std::launch::async, &Client::Write, this);
   writeFut_.wait();
+  readFut_.wait();
+  std::cout << "ISREADY" << IsReady(writeFut_) << std::endl;
+  std::cout << "ISREADY" << IsReady(readFut_) << std::endl;
   std::cout << "complete run" << std::endl;
 }
 
@@ -139,8 +142,6 @@ Client::~Client() {
   socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both);
   socket_.close();
   lck.unlock();
-  readFut_.get();
-  writeFut_.get();
 }
 
 } // namespace client

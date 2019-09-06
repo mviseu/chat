@@ -16,7 +16,6 @@ public:
 private:
   auto MoveSocket(int clientIndex, boost::asio::ip::tcp::socket socket) -> void;
   auto PostSocket(int clientIndex, boost::asio::ip::tcp::socket socket) -> void;
-  auto PostAccept() -> void;
   auto DoAccept() -> void;
   auto RunWorkThread() -> void;
 

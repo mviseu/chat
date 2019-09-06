@@ -13,6 +13,8 @@ auto Server::RunWorkThread() -> void {
     ioContext_.run();
   } catch (...) {
     std::cout << "Exception" << std::endl;
+    work_.reset();
+    ioContext_.stop();
     throw;
   }
 }
@@ -33,12 +35,8 @@ Server::Server(int maxNrClients, int port)
 
 Server::~Server() {
   std::cout << "start destruction" << std::endl;
-  work_.reset();
   acceptor_.cancel();
   acceptor_.close();
-  ioContext_.stop();
-  std::for_each(runners_.begin(), runners_.end(),
-                [](auto &runner) { runner.get(); });
 
   // get all exceptions;
 }
@@ -61,30 +59,26 @@ auto Server::PostSocket(int clientIndex, boost::asio::ip::tcp::socket socket)
 
 auto Server::DoAccept() -> void {
   std::cout << "Start DoAccept on strand" << nrClients_ << std::endl;
-  acceptor_.async_accept([this](boost::system::error_code ec,
-                                boost::asio::ip::tcp::socket socket) {
-    std::cout << "Do Accept handler" << std::endl;
-    if (ec == boost::asio::error::operation_aborted) {
-      // if acceptor has been canceled stop here
-      return;
-    }
-    if (!ec) {
-      std::cout << "Accept successful: start reading from a new client"
-                << std::endl;
-      PostSocket(nrClients_, std::move(socket));
-      ++nrClients_;
-      std::cout << ec << std::endl;
-      if (static_cast<size_t>(nrClients_) < runners_.size()) {
-        PostAccept();
-      }
-    }
-  });
-}
-
-auto Server::PostAccept() -> void {
-  std::cout << "Post Accept" << std::endl;
-  clients_[nrClients_]->strand.post(boost::bind(&Server::DoAccept, this));
-  std::cout << "end post accept" << std::endl;
+  acceptor_.async_accept(
+      [this](boost::system::error_code ec, boost::asio::ip::tcp::socket) {
+        std::cout << "Do Accept handler" << std::endl;
+        if (ec == boost::asio::error::operation_aborted) {
+          // if acceptor has been canceled stop here
+          return;
+        }
+        if (!ec) {
+          std::cout << "Accept successful: start reading from a new client"
+                    << std::endl;
+          // try joining these -> move to socket might affect strand?
+          // PostSocket(nrClients_, std::move(socket));
+          ++nrClients_;
+          if (static_cast<size_t>(nrClients_) < runners_.size()) {
+            DoAccept();
+          }
+        } else {
+          throw ec;
+        }
+      });
 }
 
 auto Server::Run() -> void {
@@ -100,9 +94,10 @@ auto Server::Run() -> void {
 
   std::cout << "Waiting for clients..." << std::endl;
 
-  PostAccept();
+  DoAccept();
   std::cout << "After post accept" << std::endl;
   // wait on all futures? what will be the stop condition?
+
   std::for_each(runners_.begin(), runners_.end(),
                 [](auto &runner) { runner.wait(); });
 }
