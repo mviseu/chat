@@ -14,6 +14,10 @@ public:
   ~Server();
 
 private:
+  auto DoWriteHandler(int clientIndex, const boost::system::error_code &ec)
+      -> void;
+  auto WriteMessage(int clientIndex, const std::string &msg) -> void;
+  auto WriteToAll(const std::string &msg) -> void;
   auto DoMessageBodyHandler(int clientIndex,
                             const boost::system::error_code &ec,
                             const std::string &msg) -> void;

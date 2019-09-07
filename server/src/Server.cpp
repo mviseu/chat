@@ -41,6 +41,34 @@ Server::~Server() {
   acceptor_.close();
 }
 
+auto Server::DoWriteHandler(int clientIndex,
+                            const boost::system::error_code &ec) -> void {
+  std::cout << "Start do write handler for client " << clientIndex << std::endl;
+  if (ec) {
+    throw boost::system::system_error(ec); // Some other error.
+  }
+  std::cout << "End do write handler for client " << clientIndex << std::endl;
+}
+
+auto Server::WriteMessage(int clientIndex, const std::string &msg) -> void {
+  std::cout << "Start write for client" << clientIndex << std::endl;
+  const auto msgWithHeader = msg::EncodeHeader(msg);
+  boost::asio::async_write(
+      clients_[clientIndex]->socket,
+      boost::asio::buffer(msgWithHeader, msgWithHeader.size()),
+      clients_[clientIndex]->strand.wrap(
+          [this, clientIndex](const auto &ec, auto) {
+            DoWriteHandler(clientIndex, ec);
+          }));
+  std::cout << "End write for client " << clientIndex << std::endl;
+}
+
+auto Server::WriteToAll(const std::string &msg) -> void {
+  for (size_t i = 0; i < clients_.size(); ++i) {
+    clients_[i]->strand.post([this, i, msg]() { WriteMessage(i, msg); });
+  }
+}
+
 auto Server::DoMessageBodyHandler(int clientIndex,
                                   const boost::system::error_code &ec,
                                   const std::string &msg) -> void {
@@ -55,6 +83,8 @@ auto Server::DoMessageBodyHandler(int clientIndex,
   }
   std::cout << "Message for client " << clientIndex << " is " << msg
             << std::endl;
+
+  WriteToAll(msg);
   clients_[clientIndex]->strand.post(
       [this, clientIndex]() { ReadMessageSize(clientIndex); });
 }
