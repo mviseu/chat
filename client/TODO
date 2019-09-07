@@ -1,1 +1,2 @@
 # implement IsAlive function to exit the client if server is not connected
+# write now if server disconnects we have no way to stop the client immediately (cleanly)
