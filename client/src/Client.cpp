@@ -47,7 +47,7 @@ auto Client::DoRead(int32_t nrBytes) -> std::optional<std::string> {
     boost::asio::socket_base::bytes_readable command(true);
     socket_.io_control(command);
     auto nrBytesReadable = command.get();
-    if (nrBytesReadable == static_cast<size_t>(nrBytes)) {
+    if (nrBytesReadable >= static_cast<size_t>(nrBytes)) {
       boost::asio::read(socket_, boost::asio::buffer(buf, nrBytes), ec);
       lck.unlock();
       if (ec == boost::asio::error::eof) {
@@ -91,6 +91,7 @@ auto Client::ReadMessageBody(int32_t msgSize) -> std::optional<std::string> {
 }
 
 auto Client::Read() -> void {
+  std::cout << "Start read high level loop" << std::endl;
   for (;;) {
     const auto sizeMsg = ReadMessageSize();
     if (sizeMsg == std::nullopt) {
@@ -100,8 +101,10 @@ auto Client::Read() -> void {
     std::cout << "after size" << std::endl;
     const auto msg = ReadMessageBody(*sizeMsg);
     if (msg == std::nullopt) {
+      std::cout << "Failed read message body" << std::endl;
       break;
     }
+    std::cout << "Read message " << *msg << std::endl;
     PrintMessage(*msg);
   }
   std::cout << "Exit read" << std::endl;
