@@ -14,7 +14,17 @@ public:
   ~Server();
 
 private:
-  auto DoAccept() -> void;
+  auto DoMessageBodyHandler(int clientIndex,
+                            const boost::system::error_code &ec,
+                            const std::string &msg) -> void;
+
+  auto ReadMessageBody(int clientIndex, int msgSize) -> void;
+  auto DoMessageSizeHandler(int clientIndex,
+                            const boost::system::error_code &ec,
+                            const std::string &msgSize) -> void;
+
+  auto ReadMessageSize(int clientIndex) -> void;
+  auto DoAccept(int ClientIndex) -> void;
   auto RunWorkThread() -> void;
   auto Read(int clientIndex) -> void;
 

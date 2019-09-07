@@ -80,7 +80,7 @@ auto Client::DoWrite(const std::string &msg) -> bool {
 auto Client::ReadMessageSize() -> std::optional<int32_t> {
   // Read in msg header size that can have up to 4 characters representing
   // digits 0/9
-  const auto msgSize = DoRead(nrDigitsInMsgHeader);
+  const auto msgSize = DoRead(msg::nrDigitsInMsgHeader);
   return (msgSize != std::nullopt) ? std::make_optional(std::stoi(*msgSize))
                                    : std::nullopt;
 }
@@ -113,7 +113,7 @@ auto Client::Write() -> void {
       std::cout << "Exited" << std::endl;
       break;
     }
-    const auto composedMsg = EncodeHeader(message);
+    const auto composedMsg = msg::EncodeHeader(message);
     std::cout << "message: " << composedMsg << std::endl;
     const auto write = DoWrite(composedMsg);
     if (!write) {

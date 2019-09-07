@@ -1,0 +1,66 @@
+[1mdiff --git a/server/src/Server.cpp b/server/src/Server.cpp[m
+[1mindex 9d8770f..55423a5 100644[m
+[1m--- a/server/src/Server.cpp[m
+[1m+++ b/server/src/Server.cpp[m
+[36m@@ -16,6 +16,7 @@[m [mauto Server::RunWorkThread() -> void {[m
+     std::cout << "Exception" << std::endl;[m
+     work_.reset();[m
+     ioContext_.stop();[m
+[32m+[m[32m    std::cout << "after stop before throw" << std::endl;[m
+     throw;[m
+   }[m
+ }[m
+[36m@@ -38,8 +39,6 @@[m [mServer::~Server() {[m
+   std::cout << "start destruction" << std::endl;[m
+   acceptor_.cancel();[m
+   acceptor_.close();[m
+[31m-[m
+[31m-  // get all exceptions;[m
+ }[m
+ [m
+ auto Server::DoMessageBodyHandler(int clientIndex,[m
+[36m@@ -80,9 +79,16 @@[m [mauto Server::DoMessageSizeHandler(int clientIndex,[m
+     return; // Connection closed cleanly by peer.[m
+   }[m
+   if (ec) {[m
+[32m+[m[32m    std::cout << "Do message size handler for client index " << clientIndex[m
+[32m+[m[32m              << " with error ";[m
+[32m+[m[32m    std::cout << "socket is " << clients_[clientIndex]->socket.is_open()[m
+[32m+[m[32m              << std::endl;[m
+     throw boost::system::system_error(ec); // Some other error.[m
+   }[m
+[32m+[m[32m  std::cout << "no error code in message size for client " << clientIndex[m
+[32m+[m[32m            << std::endl;[m
+   const auto msgSizeInt = std::stoi(msgSize);[m
+[32m+[m[32m  std::cout << "message size is " << msgSizeInt << std::endl;[m
+   clients_[clientIndex]->strand.post([this, clientIndex, msgSizeInt]() {[m
+     ReadMessageBody(clientIndex, msgSizeInt);[m
+   });[m
+[36m@@ -95,6 +101,8 @@[m [mauto Server::ReadMessageSize(int clientIndex) -> void {[m
+                           boost::asio::buffer(buf, msg::nrDigitsInMsgHeader),[m
+                           clients_[clientIndex]->strand.wrap([m
+                               [this, clientIndex, buf](const auto &ec, auto) {[m
+[32m+[m[32m                                std::cout << "message size is " << buf[m
+[32m+[m[32m                                          << std::endl;[m
+                                 DoMessageSizeHandler(clientIndex, ec, buf);[m
+                               }));[m
+ }[m
+[36m@@ -113,7 +121,8 @@[m [mauto Server::DoAccept(int clientIndex) -> void {[m
+           std::cout << "Accept successful: start reading from a new client "[m
+                     << clientIndex << std::endl;[m
+           clients_[clientIndex]->socket = std::move(socket);[m
+[31m-          std::cout << "is socket open " << socket.is_open() << std::endl;[m
+[32m+[m[32m          std::cout << "is socket open "[m
+[32m+[m[32m                    << clients_[clientIndex]->socket.is_open() << std::endl;[m
+ [m
+           std::cout << "post for client " << clientIndex << std::endl;[m
+           clients_[clientIndex]->strand.post([m
+[36m@@ -144,8 +153,6 @@[m [mauto Server::Run() -> void {[m
+ [m
+   DoAccept(0);[m
+   std::cout << "After post accept" << std::endl;[m
+[31m-  // wait on all futures? what will be the stop condition?[m
+[31m-[m
+   std::for_each(runners_.begin(), runners_.end(),[m
+                 [](auto &runner) { runner.wait(); });[m
+ }[m

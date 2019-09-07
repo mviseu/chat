@@ -3,12 +3,18 @@
 #include <optional>
 #include <sstream>
 
-namespace client {
+namespace msg {
 
 namespace {
-auto CheckMaxSize(std::size_t size) -> void {
+auto CheckMaxSize(int size) -> void {
   if (size > maxSize) {
     throw std::runtime_error("Message is larger than allowable size");
+  }
+}
+
+auto CheckMinSize(int size) -> void {
+  if (size < 0) {
+    throw std::runtime_error("Message is lower than allowable size");
   }
 }
 
@@ -24,13 +30,18 @@ auto EncodeHeaderSize(std::size_t size) -> std::string {
 }
 } // namespace
 
+auto CheckHeaderSize(int size) -> void {
+  CheckMaxSize(size);
+  CheckMinSize(size);
+}
+
 auto EncodeHeader(const std::string &message) -> std::string {
   const auto size = message.size();
-  CheckMaxSize(size);
+  CheckHeaderSize(static_cast<int>(size));
   std::ostringstream os;
   os << EncodeHeaderSize(size);
   os << message;
   return os.str();
 }
 
-} // namespace client
+} // namespace msg

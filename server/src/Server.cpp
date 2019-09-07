@@ -1,4 +1,5 @@
 #include "Server.h"
+#include "Message.h"
 #include <algorithm>
 #include <boost/bind.hpp>
 #include <cassert>
@@ -15,6 +16,7 @@ auto Server::RunWorkThread() -> void {
     std::cout << "Exception" << std::endl;
     work_.reset();
     ioContext_.stop();
+    std::cout << "after stop before throw" << std::endl;
     throw;
   }
 }
@@ -37,38 +39,103 @@ Server::~Server() {
   std::cout << "start destruction" << std::endl;
   acceptor_.cancel();
   acceptor_.close();
-
-  // get all exceptions;
 }
 
-auto Server::Read(int clientIndex) -> void {
-  std::cout << "start read from client " << clientIndex << std::endl;
-  // boost::asio::async_read();
+auto Server::DoMessageBodyHandler(int clientIndex,
+                                  const boost::system::error_code &ec,
+                                  const std::string &msg) -> void {
+  std::cout << "Start Message body handler for client " << clientIndex
+            << std::endl;
+  if (ec == boost::asio::error::eof) {
+    std::cout << "Connection closed for client " << clientIndex << std::endl;
+    return; // Connection closed cleanly by peer.
+  }
+  if (ec) {
+    throw boost::system::system_error(ec); // Some other error.
+  }
+  std::cout << "Message for client " << clientIndex << " is " << msg
+            << std::endl;
 }
 
-auto Server::DoAccept() -> void {
-  std::cout << "Start DoAccept on strand" << nrClients_ << std::endl;
-  acceptor_.async_accept([this](boost::system::error_code ec,
-                                boost::asio::ip::tcp::socket socket) {
-    std::cout << "Do Accept handler" << std::endl;
-    if (ec == boost::asio::error::operation_aborted) {
-      // if acceptor has been canceled stop here
-      return;
-    }
-    if (!ec) {
-      std::cout << "Accept successful: start reading from a new client"
-                << std::endl;
-      clients_[nrClients_]->socket = std::move(socket);
-      clients_[nrClients_]->strand.post([this]() { this->Read(nrClients_); });
+auto Server::ReadMessageBody(int clientIndex, int msgSize) -> void {
+  std::cout << "Start read message body for client" << clientIndex << std::endl;
+  msg::CheckHeaderSize(msgSize);
+  std::string buf(msgSize, '\0');
+  boost::asio::async_read(clients_[clientIndex]->socket,
+                          boost::asio::buffer(buf, msgSize),
+                          clients_[clientIndex]->strand.wrap(
+                              [this, clientIndex, buf](const auto &ec, auto) {
+                                DoMessageBodyHandler(clientIndex, ec, buf);
+                              }));
+}
 
-      ++nrClients_;
-      if (static_cast<size_t>(nrClients_) < runners_.size()) {
-        DoAccept();
-      }
-    } else {
-      throw ec;
-    }
+auto Server::DoMessageSizeHandler(int clientIndex,
+                                  const boost::system::error_code &ec,
+                                  const std::string &msgSize) -> void {
+  std::cout << "Start Message size handler for client " << clientIndex
+            << std::endl;
+  if (ec == boost::asio::error::eof) {
+    std::cout << "Connection closed for client " << clientIndex << std::endl;
+    return; // Connection closed cleanly by peer.
+  }
+  if (ec) {
+    std::cout << "Do message size handler for client index " << clientIndex
+              << " with error ";
+    std::cout << "socket is " << clients_[clientIndex]->socket.is_open()
+              << std::endl;
+    throw boost::system::system_error(ec); // Some other error.
+  }
+  std::cout << "no error code in message size for client " << clientIndex
+            << std::endl;
+  const auto msgSizeInt = std::stoi(msgSize);
+  std::cout << "message size is " << msgSizeInt << std::endl;
+  clients_[clientIndex]->strand.post([this, clientIndex, msgSizeInt]() {
+    ReadMessageBody(clientIndex, msgSizeInt);
   });
+}
+
+auto Server::ReadMessageSize(int clientIndex) -> void {
+  std::cout << "Start read message size for client" << clientIndex << std::endl;
+  std::string buf(msg::nrDigitsInMsgHeader, '\0');
+  boost::asio::async_read(clients_[clientIndex]->socket,
+                          boost::asio::buffer(buf, msg::nrDigitsInMsgHeader),
+                          clients_[clientIndex]->strand.wrap(
+                              [this, clientIndex, buf](const auto &ec, auto) {
+                                std::cout << "message size is " << buf
+                                          << std::endl;
+                                DoMessageSizeHandler(clientIndex, ec, buf);
+                              }));
+}
+
+auto Server::DoAccept(int clientIndex) -> void {
+  std::cout << "Start DoAccept on strand" << clientIndex << std::endl;
+  acceptor_.async_accept(
+      [this, clientIndex](boost::system::error_code ec,
+                          boost::asio::ip::tcp::socket socket) {
+        std::cout << "Do Accept handler" << std::endl;
+        if (ec == boost::asio::error::operation_aborted) {
+          // if acceptor has been canceled stop here
+          return;
+        }
+        if (!ec) {
+          std::cout << "Accept successful: start reading from a new client "
+                    << clientIndex << std::endl;
+          clients_[clientIndex]->socket = std::move(socket);
+          std::cout << "is socket open "
+                    << clients_[clientIndex]->socket.is_open() << std::endl;
+
+          std::cout << "post for client " << clientIndex << std::endl;
+          clients_[clientIndex]->strand.post(
+              [this, clientIndex]() { ReadMessageSize(clientIndex); });
+
+          ++nrClients_;
+          if (static_cast<size_t>(nrClients_) < runners_.size()) {
+            DoAccept(clientIndex + 1);
+          }
+        } else {
+          throw ec;
+        }
+      });
 }
 
 auto Server::Run() -> void {
@@ -84,10 +151,8 @@ auto Server::Run() -> void {
 
   std::cout << "Waiting for clients..." << std::endl;
 
-  DoAccept();
+  DoAccept(0);
   std::cout << "After post accept" << std::endl;
-  // wait on all futures? what will be the stop condition?
-
   std::for_each(runners_.begin(), runners_.end(),
                 [](auto &runner) { runner.wait(); });
 }
