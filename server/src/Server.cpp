@@ -44,6 +44,11 @@ Server::~Server() {
 auto Server::DoWriteHandler(int clientIndex,
                             const boost::system::error_code &ec) -> void {
   std::cout << "Start do write handler for client " << clientIndex << std::endl;
+  // TODO read transport not connected in doc
+  if (ec.value() == 32) {
+    std::cout << "ignore disconnected client " << clientIndex << std::endl;
+    return;
+  }
   if (ec) {
     throw boost::system::system_error(ec); // Some other error.
   }
