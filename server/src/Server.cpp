@@ -51,16 +51,18 @@ auto Server::DoWriteHandler(int clientIndex,
 }
 
 auto Server::WriteMessage(int clientIndex, const std::string &msg) -> void {
-  std::cout << "Start write for client" << clientIndex << std::endl;
-  const auto msgWithHeader = msg::EncodeHeader(msg);
-  boost::asio::async_write(
-      clients_[clientIndex]->socket,
-      boost::asio::buffer(msgWithHeader, msgWithHeader.size()),
-      clients_[clientIndex]->strand.wrap(
-          [this, clientIndex](const auto &ec, auto) {
-            DoWriteHandler(clientIndex, ec);
-          }));
-  std::cout << "End write for client " << clientIndex << std::endl;
+  if (clients_[clientIndex]->socket.is_open()) {
+    std::cout << "Start write for client" << clientIndex << std::endl;
+    const auto msgWithHeader = msg::EncodeHeader(msg);
+    boost::asio::async_write(
+        clients_[clientIndex]->socket,
+        boost::asio::buffer(msgWithHeader, msgWithHeader.size()),
+        clients_[clientIndex]->strand.wrap(
+            [this, clientIndex](const auto &ec, auto) {
+              DoWriteHandler(clientIndex, ec);
+            }));
+    std::cout << "End write for client " << clientIndex << std::endl;
+  }
 }
 
 auto Server::WriteToAll(const std::string &msg) -> void {
