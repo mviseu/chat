@@ -1,2 +1,4 @@
 #TODO
 * Make sure write error is replaced by appropriate enum instead of raw value
+
+* write an exit function to stop the server
