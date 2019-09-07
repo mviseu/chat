@@ -41,44 +41,33 @@ Server::~Server() {
   // get all exceptions;
 }
 
-auto Server::MoveSocket(int clientIndex, boost::asio::ip::tcp::socket socket)
-    -> void {
-  std::cout << "moving socket for client " << clientIndex << std::endl;
-  clients_[clientIndex]->socket = std::move(socket);
-  std::cout << "end movesocket for client " << clientIndex << std::endl;
-}
-
-auto Server::PostSocket(int clientIndex, boost::asio::ip::tcp::socket socket)
-    -> void {
-  std::cout << "Post socket for client " << clientIndex << std::endl;
-  clients_[clientIndex]->strand.post([this, clientIndex, &socket]() {
-    this->MoveSocket(clientIndex, std::move(socket));
-  });
-  std::cout << "end postsocket for client " << clientIndex << std::endl;
+auto Server::Read(int clientIndex) -> void {
+  std::cout << "start read from client " << clientIndex << std::endl;
 }
 
 auto Server::DoAccept() -> void {
   std::cout << "Start DoAccept on strand" << nrClients_ << std::endl;
-  acceptor_.async_accept(
-      [this](boost::system::error_code ec, boost::asio::ip::tcp::socket) {
-        std::cout << "Do Accept handler" << std::endl;
-        if (ec == boost::asio::error::operation_aborted) {
-          // if acceptor has been canceled stop here
-          return;
-        }
-        if (!ec) {
-          std::cout << "Accept successful: start reading from a new client"
-                    << std::endl;
-          // try joining these -> move to socket might affect strand?
-          // PostSocket(nrClients_, std::move(socket));
-          ++nrClients_;
-          if (static_cast<size_t>(nrClients_) < runners_.size()) {
-            DoAccept();
-          }
-        } else {
-          throw ec;
-        }
-      });
+  acceptor_.async_accept([this](boost::system::error_code ec,
+                                boost::asio::ip::tcp::socket socket) {
+    std::cout << "Do Accept handler" << std::endl;
+    if (ec == boost::asio::error::operation_aborted) {
+      // if acceptor has been canceled stop here
+      return;
+    }
+    if (!ec) {
+      std::cout << "Accept successful: start reading from a new client"
+                << std::endl;
+      clients_[nrClients_]->socket = std::move(socket);
+      clients_[nrClients_]->strand.post([this]() { this->Read(nrClients_); });
+
+      ++nrClients_;
+      if (static_cast<size_t>(nrClients_) < runners_.size()) {
+        DoAccept();
+      }
+    } else {
+      throw ec;
+    }
+  });
 }
 
 auto Server::Run() -> void {
