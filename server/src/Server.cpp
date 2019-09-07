@@ -55,6 +55,8 @@ auto Server::DoMessageBodyHandler(int clientIndex,
   }
   std::cout << "Message for client " << clientIndex << " is " << msg
             << std::endl;
+  clients_[clientIndex]->strand.post(
+      [this, clientIndex]() { ReadMessageSize(clientIndex); });
 }
 
 auto Server::ReadMessageBody(int clientIndex, int msgSize) -> void {
