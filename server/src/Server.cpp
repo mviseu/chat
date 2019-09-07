@@ -60,12 +60,12 @@ auto Server::DoMessageBodyHandler(int clientIndex,
 auto Server::ReadMessageBody(int clientIndex, int msgSize) -> void {
   std::cout << "Start read message body for client" << clientIndex << std::endl;
   msg::CheckHeaderSize(msgSize);
-  std::string buf(msgSize, '\0');
+  auto buf(std::make_shared<std::string>(msgSize, '\0'));
   boost::asio::async_read(clients_[clientIndex]->socket,
-                          boost::asio::buffer(buf, msgSize),
+                          boost::asio::buffer(*buf, msgSize),
                           clients_[clientIndex]->strand.wrap(
                               [this, clientIndex, buf](const auto &ec, auto) {
-                                DoMessageBodyHandler(clientIndex, ec, buf);
+                                DoMessageBodyHandler(clientIndex, ec, *buf);
                               }));
 }
 
@@ -96,15 +96,17 @@ auto Server::DoMessageSizeHandler(int clientIndex,
 
 auto Server::ReadMessageSize(int clientIndex) -> void {
   std::cout << "Start read message size for client" << clientIndex << std::endl;
-  std::string buf(msg::nrDigitsInMsgHeader, '\0');
-  boost::asio::async_read(clients_[clientIndex]->socket,
-                          boost::asio::buffer(buf, msg::nrDigitsInMsgHeader),
-                          clients_[clientIndex]->strand.wrap(
-                              [this, clientIndex, buf](const auto &ec, auto) {
-                                std::cout << "message size is " << buf
-                                          << std::endl;
-                                DoMessageSizeHandler(clientIndex, ec, buf);
-                              }));
+  auto buf(std::make_shared<std::string>(msg::nrDigitsInMsgHeader, '\0'));
+  boost::asio::async_read(
+      clients_[clientIndex]->socket,
+      boost::asio::buffer(*buf, msg::nrDigitsInMsgHeader),
+      clients_[clientIndex]->strand.wrap(
+          [this, clientIndex, buf](const auto &ec, auto nrBytes) {
+            std::cout << "nr bytes read is " << nrBytes << std::endl;
+            std::cout << "message size is " << *buf << std::endl;
+            DoMessageSizeHandler(clientIndex, ec, *buf);
+          }));
+  std::cout << "End ReadMessageSize for client " << clientIndex << std::endl;
 }
 
 auto Server::DoAccept(int clientIndex) -> void {
