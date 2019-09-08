@@ -94,6 +94,8 @@ auto Server::DoMessageBodyHandler(int clientIndex,
   WriteToAll(msg);
   clients_[clientIndex]->strand.post(
       [this, clientIndex]() { ReadMessageSize(clientIndex); });
+  std::cout << "End DoMessageBodyHandler for client " << clientIndex
+            << std::endl;
 }
 
 auto Server::ReadMessageBody(int clientIndex, int msgSize) -> void {
@@ -106,6 +108,7 @@ auto Server::ReadMessageBody(int clientIndex, int msgSize) -> void {
                               [this, clientIndex, buf](const auto &ec, auto) {
                                 DoMessageBodyHandler(clientIndex, ec, *buf);
                               }));
+  std::cout << "End read message body for client " << clientIndex << std::endl;
 }
 
 auto Server::DoMessageSizeHandler(int clientIndex,
@@ -131,6 +134,8 @@ auto Server::DoMessageSizeHandler(int clientIndex,
   clients_[clientIndex]->strand.post([this, clientIndex, msgSizeInt]() {
     ReadMessageBody(clientIndex, msgSizeInt);
   });
+  std::cout << "End DoMessageSizeHandler for client " << clientIndex
+            << std::endl;
 }
 
 auto Server::ReadMessageSize(int clientIndex) -> void {
