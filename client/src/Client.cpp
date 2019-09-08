@@ -71,7 +71,13 @@ auto Client::DoWrite(const std::string &msg) -> bool {
   boost::asio::write(socket_, boost::asio::buffer(msg, msg.size()), ec);
   lck.unlock();
   std::cout << "write done" << std::endl;
+  if (ec == boost::asio::error::broken_pipe) {
+
+    std::cout << "Write detected that its not connected" << std::endl;
+    return false; // server has been disconnected
+  }
   if (ec) {
+    std::cout << "throwing here" << std::endl;
     throw boost::system::system_error(ec); // Some other error.
   }
   return true;
@@ -120,6 +126,7 @@ auto Client::Write() -> void {
     std::cout << "message: " << composedMsg << std::endl;
     const auto write = DoWrite(composedMsg);
     if (!write) {
+      std::cout << "failed write break" << std::endl;
       break;
     }
   }
@@ -141,9 +148,11 @@ auto Client::Run(const HostPort &hostport) -> void {
 }
 
 Client::~Client() {
+  boost::system::error_code ec;
   std::unique_lock<std::mutex> lck(mtxSocket_);
-  socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both);
-  socket_.close();
+  socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both,
+                   ec); // ignore errors
+  socket_.close(ec);
   lck.unlock();
 }
 
