@@ -73,19 +73,13 @@ auto Client::DoRead(int32_t nrBytes) -> std::optional<std::string> {
 
 auto Client::DoWrite(const std::string &msg) -> bool {
   boost::system::error_code ec;
-  std::cout << "write started before lock" << std::endl;
   std::unique_lock<std::mutex> lck(mtxSocket_);
-  std::cout << "write started after lock" << std::endl;
   boost::asio::write(socket_, boost::asio::buffer(msg, msg.size()), ec);
   lck.unlock();
-  std::cout << "write done" << std::endl;
   if (ec == boost::asio::error::broken_pipe) {
-
-    std::cout << "Write detected that its not connected" << std::endl;
     return false; // server has been disconnected
   }
   if (ec) {
-    std::cout << "throwing here" << std::endl;
     throw boost::system::system_error(ec); // Some other error.
   }
   return true;
@@ -99,7 +93,6 @@ auto Client::CanWeWriteToServer() -> void {
     boost::asio::write(socket_, boost::asio::buffer(msg, msg.size()), ec);
     lck.unlock();
     if (ec) {
-      std::cout << "server is disconnected" << std::endl;
       return;
     }
     LongSleep();
@@ -128,23 +121,17 @@ auto Client::Exit() -> void {
 }
 
 auto Client::Read() -> void {
-  std::cout << "Start read high level loop" << std::endl;
   for (;;) {
     const auto sizeMsg = ReadMessageSize();
     if (sizeMsg == std::nullopt) {
-      std::cout << "going to break in Cient::Read" << std::endl;
       break;
     }
-    std::cout << "after size" << std::endl;
     const auto msg = ReadMessageBody(*sizeMsg);
     if (msg == std::nullopt) {
-      std::cout << "Failed read message body" << std::endl;
       break;
     }
-    std::cout << "Read message " << *msg << std::endl;
     PrintMessage(*msg);
   }
-  std::cout << "Exit read" << std::endl;
 }
 
 auto Client::Write() -> void {
@@ -155,17 +142,13 @@ auto Client::Write() -> void {
     }
     const auto message = ag.GetLine();
     if (!message.empty()) {
-      std::cout << message << std::endl;
       if (exitCommand == ToLower(message)) {
-        std::cout << "Exited" << std::endl;
         Exit();
         break;
       }
       const auto composedMsg = msg::EncodeHeader(message);
-      std::cout << "message: " << composedMsg << std::endl;
       const auto write = DoWrite(composedMsg);
       if (!write) {
-        std::cout << "failed write break" << std::endl;
         break;
       }
     }
@@ -187,10 +170,6 @@ auto Client::Run(const HostPort &hostport) -> void {
   isDeadFut_.wait();
   readFut_.wait();
   writeFut_.wait();
-
-  std::cout << "ISREADY" << IsReady(writeFut_) << std::endl;
-  std::cout << "ISREADY" << IsReady(readFut_) << std::endl;
-  std::cout << "complete run" << std::endl;
 }
 
 Client::~Client() { Exit(); }
