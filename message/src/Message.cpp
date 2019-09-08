@@ -30,6 +30,10 @@ auto EncodeHeaderSize(std::size_t size) -> std::string {
 }
 } // namespace
 
+auto GetIsAliveMsg() -> std::string { return std::string("0000"); }
+
+auto IsThisAPingMessage(int msgSizeInt) -> bool { return msgSizeInt == 0; }
+
 auto CheckHeaderSize(int size) -> void {
   CheckMaxSize(size);
   CheckMinSize(size);

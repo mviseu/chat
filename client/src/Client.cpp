@@ -1,4 +1,5 @@
 #include "Client.h"
+#include "GetLineAsync.h"
 #include "Message.h"
 #include <chrono>
 #include <iostream>
@@ -32,6 +33,10 @@ auto ToLower(const std::string &s) -> std::string {
   return lowerString;
 }
 
+auto QuickSleep() -> void {
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+}
+
 } // namespace
 
 auto Client::DoRead(int32_t nrBytes) -> std::optional<std::string> {
@@ -39,8 +44,7 @@ auto Client::DoRead(int32_t nrBytes) -> std::optional<std::string> {
   boost::system::error_code ec;
   for (;;) {
     // exit has been pressed
-    if (IsReady(writeFut_)) {
-      std::cout << "write future is ready" << std::endl;
+    if (IsReady(isDeadFut_)) {
       return std::nullopt; // Exit has been typed by this client
     }
     std::unique_lock<std::mutex> lck(mtxSocket_);
@@ -59,7 +63,7 @@ auto Client::DoRead(int32_t nrBytes) -> std::optional<std::string> {
       return buf;
     }
     lck.unlock();
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    QuickSleep();
   }
 }
 
@@ -81,6 +85,21 @@ auto Client::DoWrite(const std::string &msg) -> bool {
     throw boost::system::system_error(ec); // Some other error.
   }
   return true;
+}
+
+auto Client::IsServerAlive() -> void {
+  const auto msg = msg::GetIsAliveMsg();
+  boost::system::error_code ec;
+  for (;;) {
+    std::unique_lock<std::mutex> lck(mtxSocket_);
+    boost::asio::write(socket_, boost::asio::buffer(msg, msg.size()), ec);
+    lck.unlock();
+    if (ec) {
+      std::cout << "server is disconnected" << std::endl;
+      return;
+    }
+    QuickSleep();
+  }
 }
 
 auto Client::ReadMessageSize() -> std::optional<int32_t> {
@@ -117,31 +136,44 @@ auto Client::Read() -> void {
 }
 
 auto Client::Write() -> void {
-  for (std::string message; std::getline(std::cin, message);) {
-    if (exitCommand == ToLower(message)) {
-      std::cout << "Exited" << std::endl;
+  AsyncGetline ag;
+  for (;;) {
+    if (IsReady(isDeadFut_)) {
       break;
     }
-    const auto composedMsg = msg::EncodeHeader(message);
-    std::cout << "message: " << composedMsg << std::endl;
-    const auto write = DoWrite(composedMsg);
-    if (!write) {
-      std::cout << "failed write break" << std::endl;
-      break;
+    const auto message = ag.GetLine();
+    if (!message.empty()) {
+      std::cout << message << std::endl;
+      if (exitCommand == ToLower(message)) {
+        std::cout << "Exited" << std::endl;
+        break;
+      }
+      const auto composedMsg = msg::EncodeHeader(message);
+      std::cout << "message: " << composedMsg << std::endl;
+      const auto write = DoWrite(composedMsg);
+      if (!write) {
+        std::cout << "failed write break" << std::endl;
+        break;
+      }
     }
+    QuickSleep();
   }
 }
-
-// Run launches separate threads to read/write and returns after runFor duration
+// Run launches separate threads to read/write and returns after runFor
+// duration
 auto Client::Run(const HostPort &hostport) -> void {
   boost::asio::ip::tcp::resolver resolver(ioContext_);
   auto endpoints = resolver.resolve(hostport.host, hostport.port);
   boost::asio::connect(socket_, endpoints);
   PrintWelcomeMessage();
+  isDeadFut_ = std::async(std::launch::async, &Client::IsServerAlive, this);
   readFut_ = std::async(std::launch::async, &Client::Read, this);
   writeFut_ = std::async(std::launch::async, &Client::Write, this);
-  writeFut_.wait();
+
+  isDeadFut_.wait();
   readFut_.wait();
+  writeFut_.wait();
+
   std::cout << "ISREADY" << IsReady(writeFut_) << std::endl;
   std::cout << "ISREADY" << IsReady(readFut_) << std::endl;
   std::cout << "complete run" << std::endl;

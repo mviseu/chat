@@ -131,9 +131,15 @@ auto Server::DoMessageSizeHandler(int clientIndex,
             << std::endl;
   const auto msgSizeInt = std::stoi(msgSize);
   std::cout << "message size is " << msgSizeInt << std::endl;
-  clients_[clientIndex]->strand.post([this, clientIndex, msgSizeInt]() {
-    ReadMessageBody(clientIndex, msgSizeInt);
-  });
+  if (msg::IsThisAPingMessage(msgSizeInt)) {
+    clients_[clientIndex]->strand.post([this, clientIndex]() {
+      ReadMessageSize(clientIndex);
+    }); // go back to start
+  } else {
+    clients_[clientIndex]->strand.post([this, clientIndex, msgSizeInt]() {
+      ReadMessageBody(clientIndex, msgSizeInt);
+    });
+  }
   std::cout << "End DoMessageSizeHandler for client " << clientIndex
             << std::endl;
 }

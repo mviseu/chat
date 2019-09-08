@@ -19,11 +19,13 @@ private:
   auto Write() -> void;
   auto ReadMessageSize() -> std::optional<int32_t>;
   auto ReadMessageBody(int32_t msgSize) -> std::optional<std::string>;
+  auto IsServerAlive() -> void;
   boost::asio::io_context ioContext_;
   boost::asio::ip::tcp::socket socket_;
   std::mutex mtxSocket_;
   std::future<void> readFut_;
   std::future<void> writeFut_;
+  std::future<void> isDeadFut_;
 };
 
 } // namespace client
