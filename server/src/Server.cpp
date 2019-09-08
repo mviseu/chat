@@ -57,9 +57,12 @@ auto Server::WriteMessage(int clientIndex, const std::string &msg) -> void {
   }
 }
 
-auto Server::WriteToAll(const std::string &msg) -> void {
-  for (size_t i = 0; i < clients_.size(); ++i) {
-    clients_[i]->strand.post([this, i, msg]() { WriteMessage(i, msg); });
+auto Server::WriteToAll(int clientIndex, const std::string &msg) -> void {
+  for (auto i = 0; i < static_cast<int>(clients_.size()); ++i) {
+    // don't write a message that was sent from the same client
+    if (i != clientIndex) {
+      clients_[i]->strand.post([this, i, msg]() { WriteMessage(i, msg); });
+    }
   }
 }
 
@@ -72,7 +75,7 @@ auto Server::DoMessageBodyHandler(int clientIndex,
   if (ec) {
     throw boost::system::system_error(ec); // Some other error.
   }
-  WriteToAll(msg);
+  WriteToAll(clientIndex, msg);
   clients_[clientIndex]->strand.post(
       [this, clientIndex]() { ReadMessageSize(clientIndex); });
 }

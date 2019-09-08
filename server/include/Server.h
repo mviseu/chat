@@ -16,7 +16,7 @@ public:
 private:
   auto DoWriteHandler(const boost::system::error_code &ec) -> void;
   auto WriteMessage(int clientIndex, const std::string &msg) -> void;
-  auto WriteToAll(const std::string &msg) -> void;
+  auto WriteToAll(int clientIndex, const std::string &msg) -> void;
   auto DoMessageBodyHandler(int clientIndex,
                             const boost::system::error_code &ec,
                             const std::string &msg) -> void;
