@@ -37,6 +37,10 @@ auto QuickSleep() -> void {
   std::this_thread::sleep_for(std::chrono::milliseconds(10));
 }
 
+auto LongSleep() -> void {
+  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+}
+
 } // namespace
 
 auto Client::DoRead(int32_t nrBytes) -> std::optional<std::string> {
@@ -87,7 +91,7 @@ auto Client::DoWrite(const std::string &msg) -> bool {
   return true;
 }
 
-auto Client::IsServerAlive() -> void {
+auto Client::CanWeWriteToServer() -> void {
   const auto msg = msg::GetIsAliveMsg();
   boost::system::error_code ec;
   for (;;) {
@@ -98,7 +102,7 @@ auto Client::IsServerAlive() -> void {
       std::cout << "server is disconnected" << std::endl;
       return;
     }
-    QuickSleep();
+    LongSleep();
   }
 }
 
@@ -113,6 +117,14 @@ auto Client::ReadMessageSize() -> std::optional<int32_t> {
 auto Client::ReadMessageBody(int32_t msgSize) -> std::optional<std::string> {
   // Read in msg body
   return DoRead(msgSize);
+}
+
+auto Client::Exit() -> void {
+  boost::system::error_code ec;
+  std::lock_guard<std::mutex> lck(mtxSocket_);
+  socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both,
+                   ec); // ignore errors
+  socket_.close(ec);
 }
 
 auto Client::Read() -> void {
@@ -146,6 +158,7 @@ auto Client::Write() -> void {
       std::cout << message << std::endl;
       if (exitCommand == ToLower(message)) {
         std::cout << "Exited" << std::endl;
+        Exit();
         break;
       }
       const auto composedMsg = msg::EncodeHeader(message);
@@ -166,7 +179,8 @@ auto Client::Run(const HostPort &hostport) -> void {
   auto endpoints = resolver.resolve(hostport.host, hostport.port);
   boost::asio::connect(socket_, endpoints);
   PrintWelcomeMessage();
-  isDeadFut_ = std::async(std::launch::async, &Client::IsServerAlive, this);
+  isDeadFut_ =
+      std::async(std::launch::async, &Client::CanWeWriteToServer, this);
   readFut_ = std::async(std::launch::async, &Client::Read, this);
   writeFut_ = std::async(std::launch::async, &Client::Write, this);
 
@@ -179,13 +193,6 @@ auto Client::Run(const HostPort &hostport) -> void {
   std::cout << "complete run" << std::endl;
 }
 
-Client::~Client() {
-  boost::system::error_code ec;
-  std::unique_lock<std::mutex> lck(mtxSocket_);
-  socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both,
-                   ec); // ignore errors
-  socket_.close(ec);
-  lck.unlock();
-}
+Client::~Client() { Exit(); }
 
 } // namespace client
